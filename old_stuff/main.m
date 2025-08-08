@@ -1,0 +1,86 @@
+c=1;
+close all
+rng(1)
+mu=1;
+xa=0:0.01:2;
+
+
+y=mu*(min(0,xa-c)+c);
+
+plot(xa,y)
+
+x=sdpvar(1);
+s=sdpvar(1);
+obj=abs(s-(x-c));
+y=mu*(s+c);
+a=optimizer([s<=0; ],obj,[],x,y)
+
+
+ya=a(xa);
+sQuadprog=quadprog(eye(8),-2*(x0-c),blkdiag(eye(4),zeros(4,4)),zeros(8,1),[],[])
+
+hold on
+
+plot(xa,ya)
+
+
+%%
+P = [
+    [0, 1.0, 0.0, 0.0],
+    [0.0, 0, 0.6, 0.4],
+    [0.7, 0.3, 0, 0.0],
+    [0.8, 0.2, 0, 0.0]
+    ]';
+
+
+mu = [    1.0,    8.0,    4.0,    4.0   ]';
+
+
+horizon=1;
+deltaT=0.1
+c=sdpvar(4,horizon);
+x0=sdpvar(4,horizon);
+xDot=sdpvar(4,horizon);
+s=sdpvar(4,horizon);
+obj=1;
+gap=x0-c;
+
+constrI=[s<=0; ];
+constrO=[];
+for tIdx=1:horizon
+    obj=obj+sum((s(:,tIdx)-gap(:,tIdx)).^2);
+    constrI=[ xDot(:,tIdx)==(P-eye(4))*(mu.*(s(:,tIdx)+c(:,tIdx))); % P is zero on diagonal
+        constrI];
+end
+for tIdx=1:horizon-1
+    constrO=[ constrO; x0(:,tIdx+1)==x0(:,tIdx)+deltaT*xDot(:,tIdx); ];
+end
+%in=[x0(:,1);c(:)];
+%stepOpt=optimizer(constr,obj,[],in,[xN;s;s-(x0-c)]);
+%stepOpt=optimizer(constr,obj,sdpsettings('solver','gurobi'),in,[x0(:,2:end)]);
+%kktInner=kkt(constr,obj,in);
+x0R=100*ones(4,1)
+tInt=[0,.1];
+KKTCond=kkt(constrI,obj,[x0(:);c(:)])
+%optimize([c>=1;c(2:4,:)<=16;x0(:,1)==x0R;constrO;x0>=0; ...
+%        KKTCond; c(1,:)==1000],norm(x0(3,2:end)-75,1))
+%%
+optim=optimizer([c>=1;c(2:4,:)<=16;constrO;x0>=0; KKTCond; c(1,:)==1000],norm(x0(2:4,2:end)-75,1),[],[x0(:,1)],c)
+figure
+hold on
+for kSim=1:200   
+    %optimize([c>=1;c(2:4,:)<=16;x0(:,1)==x0R;constrO;x0>=0;  KKTCond; c(1,:)==1000],norm(x0(3,2:end)-75,1))
+    cOpt=optim(x0R);
+    %cOpt=value(c);
+    %stepSystem(x0R,cOpt(:,1))';
+    %value(xDot(:,1))';
+    odeFun = @(t,x0 ) stepSystem(x0,[cOpt(:,1)]);
+    [tff,x0ff]=ode15s(odeFun,tInt,x0R,[]);
+    x0R=x0ff(end,:)'
+    plot(tff,x0ff);
+    tInt=tInt+diff(tInt);
+end
+title('comp constr')
+
+%xopt=stepOpt([x0R; newC(:)]);
+hold on

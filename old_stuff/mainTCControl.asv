@@ -1,0 +1,56 @@
+c=1;
+close all
+
+mu=1;
+xa=0:0.01:2;
+
+
+y=mu*(min(0,xa-c)+c);
+
+plot(xa,y)
+
+x=sdpvar(1);
+s=sdpvar(1);
+obj=abs(s-(x-c));
+y=mu*(s+c);
+a=optimizer([s<=0; ],obj,[],x,y)
+
+
+ya=a(xa);
+hold on
+
+plot(xa,ya)
+
+%%
+figA=figure
+hold on
+figB=figure
+hold on
+
+
+x0=ones(4,1)*100;
+x0A=x0;
+tInt=[0,0.1];
+dslen=500;
+
+uP=randi(15,[3,1]);
+for i=1:dslen-1
+    %sum(x0)
+    datasetX(i,:)=x0;
+    newC=1+randi(15,[3,1]);
+    
+    costFun = @(uSeq ) costFunSysID(uSeq,x0);
+    fmincon(costFun,uP,[],[],[],[],)
+    odeFun = @(t,x0 ) stepSystem(x0,[1000; newC]);
+    %odeFunOpt=@(t,x0) stepOpt([x0;1000; newC]);
+    [tff,x0ff]=ode15s(odeFun,tInt,x0,[]);
+    x0=x0ff(end,:)';
+    tInt=tInt+3;
+    
+end
+datasetX(i+1,:)=x0;
+
+
+
+
+
